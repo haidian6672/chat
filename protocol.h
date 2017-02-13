@@ -19,6 +19,7 @@ const uint32_t MSG_TEXT     = 5;
 const uint32_t MSG_ACK      = 6;
 const uint32_t MSG_GETTEXT  = 7;
 const uint32_t MSG_TEXTFIN  = 8;
+const uint32_t MSG_PUB_KEY  = 9;
 
 void PushToBuffer(const char* from, size_t size, vector<char>& buffer) {
     const char* byte = from;
@@ -124,6 +125,40 @@ struct TMessageSignIn : public TMessage {
     }
 };
 
+struct TMessageServerPubKey : public TMessage {
+    const char *Pub_key;
+    unsigned int Pub_len;
+
+    TMessageServerPubKey(const char *pub_key = NULL, unsigned int pub_len = 0)
+        : TMessage(MSG_PUB_KEY)
+        , Pub_key(pub_key)
+        , Pub_len(pub_len)
+    {
+    }
+
+    virtual bool Write(int socketFD) {
+        vector<char> buffer;
+        PushToBuffer((const char*)&Pub_len, sizeof(Pub_len), buffer);
+        PushToBuffer(Pub_key, Pub_len, buffer);
+        Header.Size = buffer.size();
+        if (!TMessage::Write(socketFD))
+            return false;
+        return (size_t)write(socketFD, &buffer[0], buffer.size()) == buffer.size();
+    }
+
+    virtual bool Read(const TMessageHeader& header, int socketFD) {
+        Header = header;
+        vector<char> buffer(Header.Size);
+        if ((size_t)read(socketFD, &buffer[0], buffer.size()) != buffer.size())
+            return false;
+        size_t pos = 0;
+        Pub_len = *((unsigned int *)&buffer[pos]);
+        pos += sizeof(Pub_len);
+        Pub_key = PopFromBuffer(buffer, pos).data();
+        return true;
+    }
+};
+
 struct TMessageText : public TMessage {
     string Sender;
     string Reciever;
@@ -203,6 +238,10 @@ auto_ptr<TMessage> PopMessage(int connectionFD) {
     switch (header.Tag) {
     case MSG_SIGN_IN:
         msg.reset(new TMessageSignIn());
+        break;
+
+    case MSG_PUB_KEY:
+        msg.reset(new TMessageServerPubKey());
         break;
 
     case MSG_SIGN_OUT: case MSG_ACK: case MSG_DENY: case MSG_GETTEXT: case MSG_TEXTFIN:
