@@ -22,6 +22,7 @@
 
 #include <openssl/bn.h>
 #include <openssl/rsa.h>
+#include <openssl/pem.h>
 #define DEFBITS 2048
 
 using namespace std;
@@ -81,17 +82,20 @@ public:
         , bn(NULL)
         , rsa(NULL)
         , bits(DEFBITS)
+        , pub(NULL)
+        , pub_len(0)
+        , pub_key(NULL)
     {
     }
 
     bool Start() {
+        // generate RSA key pair.
         bn = BN_new();
         if (bn == NULL) {
             cerr << "BN_new() return NULL.\n";
             return false;
         }
-        unsigned long e = RSA_F4;
-        BN_set_word(bn, e);
+        BN_set_word(bn, RSA_F4);
         rsa = RSA_new();
         if (rsa == NULL) {
             cerr << "RSA_new() return NULL.\n";
@@ -102,6 +106,13 @@ public:
             return false;
         }
         RSA_print_fp(stdout, rsa, 0);
+
+        // extract the public key.
+        pub = BIO_new(BIO_s_mem());
+        PEM_write_bio_RSAPublicKey(pub, rsa);
+        pub_len = BIO_pending(pub);
+        pub_key = new char(pub_len);
+        BIO_read(pub, pub_key, pub_len);
 
         int socketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (socketFD == -1) {
@@ -149,6 +160,7 @@ public:
 
         close(socketFD);
         RSA_free(rsa);
+        delete pub_key;
         return true;
     }
 
@@ -280,5 +292,9 @@ private:
     BIGNUM *bn;
     RSA *rsa;
     int bits;
+    BIO *pub;
+    size_t pub_len;
+    char *pub_key;
+
 };
 
