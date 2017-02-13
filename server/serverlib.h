@@ -20,6 +20,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <openssl/bn.h>
+#include <openssl/rsa.h>
+#define DEFBITS 2048
+
 using namespace std;
 
 class TClient {
@@ -74,10 +78,31 @@ public:
     TServer(int port = DEFAULT_PORT)
         : Port(port)
         , NewThreadId(0)
+        , bn(NULL)
+        , rsa(NULL)
+        , bits(DEFBITS)
     {
     }
 
     bool Start() {
+        bn = BN_new();
+        if (bn == NULL) {
+            cerr << "BN_new() return NULL.\n";
+            return false;
+        }
+        unsigned long e = RSA_F4;
+        BN_set_word(bn, e);
+        rsa = RSA_new();
+        if (rsa == NULL) {
+            cerr << "RSA_new() return NULL.\n";
+            return false;
+        }
+        if (RSA_generate_key_ex(rsa, bits, bn, NULL) != 1) {
+            cerr << "ERROR in RSA_generate_key_ex().\n";
+            return false;
+        }
+        RSA_print_fp(stdout, rsa, 0);
+
         int socketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (socketFD == -1) {
             cerr << "Could not create socket.\n";
@@ -123,6 +148,7 @@ public:
         }
 
         close(socketFD);
+        RSA_free(rsa);
         return true;
     }
 
@@ -250,5 +276,9 @@ private:
     unordered_map<string, TClient*> Clients;
     int NewThreadId;
     unordered_map<int, thread*> Threads;
+
+    BIGNUM *bn;
+    RSA *rsa;
+    int bits;
 };
 
