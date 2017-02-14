@@ -229,9 +229,9 @@ struct TMessageList : public TMessage {
 };
 
 
-auto_ptr<TMessage> PopMessage(int connectionFD) {
+unique_ptr<TMessage> PopMessage(int connectionFD) {
     TMessageHeader header;
-    auto_ptr<TMessage> msg(NULL);
+    unique_ptr<TMessage> msg;
     if (!header.Read(connectionFD))
         return msg;
 
@@ -256,8 +256,10 @@ auto_ptr<TMessage> PopMessage(int connectionFD) {
         msg.reset(new TMessageList());
         break;
     }
-    if (msg.get() && !msg->Read(header, connectionFD))
-        return auto_ptr<TMessage>(NULL);
+    if (msg.get() && !msg->Read(header, connectionFD)) {
+        unique_ptr<TMessage> ret;
+        return ret;
+    }
 
     return msg;
 }
