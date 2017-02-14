@@ -109,10 +109,16 @@ public:
 
         // extract the public key.
         pub = BIO_new(BIO_s_mem());
-        PEM_write_bio_RSAPublicKey(pub, rsa);
+        if (!PEM_write_bio_RSAPublicKey(pub, rsa)) {
+            cerr << "ERROR in PEM_write_bio_RSAPublicKey().\n";
+            return false;
+        }
         pub_len = BIO_pending(pub);
         pub_key = new char(pub_len);
-        BIO_read(pub, pub_key, pub_len);
+        if (BIO_read(pub, pub_key, pub_len) <= 0) {
+            cerr << "ERROR in BIO_read().\n";
+            return false;
+        }
 
         int socketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (socketFD == -1) {
@@ -160,6 +166,7 @@ public:
 
         close(socketFD);
         RSA_free(rsa);
+        BIO_free_all(pub);
         delete pub_key;
         return true;
     }
@@ -208,6 +215,8 @@ private:
             ack.Write(connectionFD);
             client->SetStatus(true);
             cerr << "User " << login << " is now online.\n";
+            TMessageServerPubKey msgPubKey(pub_key, pub_len);
+            msgPubKey.Write(connectionFD);
         }
 
         bool signedOut = false;
