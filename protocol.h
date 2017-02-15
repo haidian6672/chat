@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include <unistd.h>
 
@@ -39,6 +40,17 @@ string PopFromBuffer(const vector<char>& buffer, size_t& pos) {
     string result(&buffer[pos], &buffer[pos] + size);
     pos += size;
     return result;
+}
+
+size_t PopFromBuffer(const vector<char>& buffer, size_t& pos, vector<char>& outBuf) {
+    unsigned int ret = 0;
+    if (pos >= buffer.size())
+        cerr << "ERROR param pos in PopFromBuffer().\n";
+    for (unsigned int i = pos; i < buffer.size(); i++) {
+        outBuf.push_back(i);
+        ret++;
+    }
+    return ret;
 }
 
 struct TMessageHeader {
@@ -126,20 +138,22 @@ struct TMessageSignIn : public TMessage {
 };
 
 struct TMessageServerPubKey : public TMessage {
-    const char *Pub_key;
-    unsigned int Pub_len;
+    size_t Pub_len;
+    vector<char> Pub_key;
 
     TMessageServerPubKey(const char *pub_key = NULL, unsigned int pub_len = 0)
         : TMessage(MSG_PUB_KEY)
-        , Pub_key(pub_key)
         , Pub_len(pub_len)
     {
+        Pub_key.clear();
+        for (size_t i = 0; i < pub_len; ++i)
+            Pub_key.push_back(*pub_key++);
     }
 
     virtual bool Write(int socketFD) {
         vector<char> buffer;
         PushToBuffer((const char*)&Pub_len, sizeof(Pub_len), buffer);
-        PushToBuffer(Pub_key, Pub_len, buffer);
+        PushToBuffer(&Pub_key[0], Pub_key.size(), buffer);
         Header.Size = buffer.size();
         if (!TMessage::Write(socketFD))
             return false;
@@ -152,9 +166,11 @@ struct TMessageServerPubKey : public TMessage {
         if ((size_t)read(socketFD, &buffer[0], buffer.size()) != buffer.size())
             return false;
         size_t pos = 0;
-        Pub_len = *((unsigned int *)&buffer[pos]);
+        Pub_len = *((size_t *)&buffer[pos]);
         pos += sizeof(Pub_len);
-        Pub_key = PopFromBuffer(buffer, pos).data();
+        if (PopFromBuffer(buffer, pos, Pub_key) != Pub_len) {
+            cerr << "ERROR in TMessageServerPubKey::Read().\n";
+        }
         return true;
     }
 };

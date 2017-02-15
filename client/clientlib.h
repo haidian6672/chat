@@ -18,6 +18,10 @@
 #include <iostream>
 #include <signal.h>
 
+#include <openssl/bn.h>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
+
 using namespace std;
 
 class TClient {
@@ -63,6 +67,7 @@ public:
         TMessageSignIn signIn(login, password);
         if (!signIn.Write(SocketFD))
             return false;
+
         unique_ptr<TMessage> msg(PopMessage(SocketFD).release());
         if (!msg.get())
             return false;
@@ -70,6 +75,17 @@ public:
             Login = login;
             Pass = password;
             cerr << "Signed in as " << login << '\n';
+        }
+
+        unique_ptr<TMessageServerPubKey> msgSerPubKey(dynamic_cast<TMessageServerPubKey*>(PopMessage(SocketFD).release()));
+        if (!msgSerPubKey.get()) {
+            cerr << "PopMessage() get NULL.\n";
+            return false;
+        }
+        if (msgSerPubKey->Header.Tag == MSG_PUB_KEY) {
+            pub = BIO_new_mem_buf(&msgSerPubKey->Pub_key[0], msgSerPubKey->Pub_len);
+            rsa = PEM_read_bio_RSAPublicKey(pub, NULL, NULL, NULL);
+            cerr << "Got server public key.\n";
             return true;
         }
         return false;
@@ -80,6 +96,8 @@ public:
         signOut.Write(SocketFD);
         shutdown(SocketFD, SHUT_RDWR);
         close(SocketFD);
+        free(pub);
+        RSA_free(rsa);
     }
 
     void Reconnect() {
@@ -139,5 +157,8 @@ private:
     int SocketFD;
     string Login;
     string Pass;
+
+    RSA *rsa;
+    BIO *pub;
 };
 
