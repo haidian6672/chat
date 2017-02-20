@@ -47,7 +47,7 @@ size_t PopFromBuffer(const vector<char>& buffer, size_t& pos, vector<char>& outB
     if (pos >= buffer.size())
         cerr << "ERROR param pos in PopFromBuffer().\n";
     for (unsigned int i = pos; i < buffer.size(); i++) {
-        outBuf.push_back(i);
+        outBuf.push_back(buffer[i]);
         ret++;
     }
     return ret;

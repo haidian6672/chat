@@ -30,6 +30,8 @@ public:
         : ServerHost(host)
         , ServerPort(port)
     {
+        pub = NULL;
+        rsa = RSA_new();
     }
 
     bool Connect() {
@@ -83,8 +85,12 @@ public:
             return false;
         }
         if (msgSerPubKey->Header.Tag == MSG_PUB_KEY) {
+            for (unsigned int i = 0; i < msgSerPubKey->Pub_len; i++) {
+                cerr << msgSerPubKey->Pub_key[i];
+            }
             pub = BIO_new_mem_buf(&msgSerPubKey->Pub_key[0], msgSerPubKey->Pub_len);
             rsa = PEM_read_bio_RSAPublicKey(pub, NULL, NULL, NULL);
+            RSA_print_fp(stdout, rsa, 0);
             cerr << "Got server public key.\n";
             return true;
         }

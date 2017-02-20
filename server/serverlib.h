@@ -106,6 +106,10 @@ public:
             return false;
         }
         RSA_print_fp(stdout, rsa, 0);
+        RSA *rsaPub = RSAPublicKey_dup(rsa);
+        FILE *fp = fopen("rsa.pub", "wt");
+        PEM_write_RSAPublicKey(fp, rsaPub);
+        fclose(fp);
 
         // extract the public key.
         pub = BIO_new(BIO_s_mem());
